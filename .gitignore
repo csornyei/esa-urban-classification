@@ -1,0 +1,6 @@
+footprints/*
+!footprints/*.geojson
+data/*
+!data/.gitkeep
+.env
+**.zip
