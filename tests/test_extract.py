@@ -5,7 +5,10 @@ from etl.extract import calculate_intersecting_products
 
 def test__calculate_intersecting_products_no_intersecting_products():
     # the resulting gdf should be empty
-    test_case = ...  # create a test case with no intersecting products
+    test_case = [
+        {"geometry": "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))"},
+        {"geometry": "POLYGON ((2 2, 3 2, 3 3, 2 3, 2 2))"},
+    ]  # create a test case with no intersecting products
     result = calculate_intersecting_products(test_case)
     if not result.empty:
         pytest.fail(
@@ -16,9 +19,10 @@ def test__calculate_intersecting_products_no_intersecting_products():
 def test__calculate_intersecting_products_not_covering_whole_footprint(caplog):
     # the resulting gdf should contains some rows
     # it should also print a warning
-    test_case = (
-        ...
-    )  # create a test case where the intersecting products do not cover the whole footprint
+    test_case = [
+        {"geometry": "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))"},
+        {"geometry": "POLYGON ((0.5 0.5, 1.5 0.5, 1.5 1.5, 0.5 1.5, 0.5 0.5))"},
+    ]  # create a test case where the intersecting products do not cover the whole footprint
     result = calculate_intersecting_products(test_case)
     if result.empty:
         pytest.fail(
