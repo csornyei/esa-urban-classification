@@ -46,6 +46,18 @@ def get_available_products(api: SentinelAPI, footprint_path: Path) -> list:
 def _calculate_intersecting_products(
     footprint_aoi: wkt, products_gdf: gpd.GeoDataFrame
 ) -> gpd.GeoDataFrame:
+    """
+    Calculate intersecting products.
+
+    This function calculates the intersecting products between the area of interest (AOI) and the products GeoDataFrame.
+
+    Parameters:
+    footprint_aoi (wkt): The footprint of the area of interest.
+    products_gdf (gpd.GeoDataFrame): The products GeoDataFrame.
+
+    Returns:
+    gpd.GeoDataFrame: The GeoDataFrame of intersecting products.
+    """
     remaining_aoi = footprint_aoi
     intersecting_products = []
 
@@ -73,6 +85,18 @@ def _calculate_intersecting_products(
 def get_intersecting_products(
     footprint_path: Path, products_gdf: gpd.GeoDataFrame
 ) -> gpd.GeoDataFrame:
+    """
+    Get intersecting products.
+
+    This function gets the intersecting products between the area of interest (AOI) and the products GeoDataFrame.
+
+    Parameters:
+    footprint_path (Path): The path to the footprint of the area of interest.
+    products_gdf (gpd.GeoDataFrame): The products GeoDataFrame.
+
+    Returns:
+    gpd.GeoDataFrame: The GeoDataFrame of intersecting products.
+    """
     footprint = geojson_to_wkt(read_geojson(footprint_path))
     footprint_aoi = wkt.loads(footprint)
     return _calculate_intersecting_products(footprint_aoi, products_gdf)
