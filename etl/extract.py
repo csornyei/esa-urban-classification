@@ -17,9 +17,9 @@ def _get_date():
     return end_date.strftime("%Y%m%d"), start_date.strftime("%Y%m%d")
 
 
-def get_available_products(api: SentinelAPI, footprint_path: str) -> list:
+def get_available_products(api: SentinelAPI, footprint_path: Path) -> list:
     footprint = geojson_to_wkt(read_geojson(footprint_path))
-    start_date, end_date = _get_date()
+    end_date, start_date = _get_date()
     products = query(
         api,
         footprint,
@@ -27,6 +27,9 @@ def get_available_products(api: SentinelAPI, footprint_path: str) -> list:
         end_date,
         cloudcoverpercentage=(0, 50)
     )
+    
+    if len(products) == 0:
+        raise ValueError("No products found")
     
     products_rows = []
     
@@ -43,10 +46,13 @@ def get_available_products(api: SentinelAPI, footprint_path: str) -> list:
         
     products_rows = sorted(products_rows, key=lambda k: k['cloudcoverpercentage'])
     
-    return gpd.GeodataFrame(products_rows, crs="EPSG:4326")
+    return gpd.GeoDataFrame(products_rows, geometry="geometry", crs="EPSG:4326")
 
 
-def get_intersecting_products(footprint_path: str, products_gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+def get_intersecting_products(
+    footprint_path: Path, 
+    products_gdf: gpd.GeoDataFrame
+) -> gpd.GeoDataFrame:
     footprint = geojson_to_wkt(read_geojson(footprint_path))
     
     footprint_aoi = wkt.loads(footprint)
@@ -77,7 +83,7 @@ def get_intersecting_products(footprint_path: str, products_gdf: gpd.GeoDataFram
 def download_and_unzip_files(
     api: SentinelAPI, 
     products_gdf: gpd.GeoDataFrame, 
-    download_dir: str
+    download_dir: Path
 ) -> None:
     download(api, products_gdf['id'].tolist(), download_dir)
     
@@ -91,19 +97,20 @@ def download_and_unzip_files(
 
 
 def gather_img_paths(
-    download_dir: str, 
+    download_dir: Path, 
     important_bands: List[str] = ['B02', 'B03', 'B04', 'B08']
 ) -> List[Path]:
     
     image_paths = []
     
-    for downloaded_dirs in Path(download_dir).iterdir():
-        if downloaded_dirs.is_file():
+    for downloaded_dir in download_dir.iterdir():
+        if downloaded_dir.is_file():
             continue
-        image_paths = downloaded_dirs.glob("GRANULE/**/IMG_DATA/*.jp2")
         
-        for image_path in image_paths:
-            if image_path.name.split("_")[2] in important_bands:
+        image_globs = list(downloaded_dir.glob("GRANULE/**/IMG_DATA/*.jp2"))
+        
+        for image_path in image_globs:
+            if image_path.stem.split("_")[2] in important_bands:
                 image_paths.append(image_path)
                 
     return image_paths
