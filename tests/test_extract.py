@@ -1,18 +1,47 @@
-from etl import extract  # noqa: F401
+import pytest
+
+from etl.extract import calculate_intersecting_products
 
 
 def test__calculate_intersecting_products_no_intersecting_products():
     # the resulting gdf should be empty
-    pass
+    test_case = ...  # create a test case with no intersecting products
+    result = calculate_intersecting_products(test_case)
+    if not result.empty:
+        pytest.fail(
+            "Expected result to be empty"
+        )  # assert that the result is an empty dataframe
 
 
-def test__calculate_intersecting_products_not_covering_whole_footprint():
+def test__calculate_intersecting_products_not_covering_whole_footprint(caplog):
     # the resulting gdf should contains some rows
     # it should also print a warning
-    pass
+    test_case = (
+        ...
+    )  # create a test case where the intersecting products do not cover the whole footprint
+    result = calculate_intersecting_products(test_case)
+    if result.empty:
+        pytest.fail(
+            "Expected result to not be empty"
+        )  # assert that the result is a dataframe with some rows
+    if "Warning: Not all products cover the whole footprint" not in caplog.text:
+        pytest.fail(
+            "Expected warning to be printed"
+        )  # assert that a warning is printed
 
 
-def test__calculate_intersecting_products_covering_whole_footprint():
+def test__calculate_intersecting_products_covering_whole_footprint(caplog):
     # the resulting gdf should contains some rows
     # it should not print a warning
-    pass
+    test_case = (
+        ...
+    )  # create a test case where the intersecting products cover the whole footprint
+    result = calculate_intersecting_products(test_case)
+    if result.empty:
+        pytest.fail(
+            "Expected result to not be empty"
+        )  # assert that the result is a dataframe with some rows
+    if "Warning: Not all products cover the whole footprint" in caplog.text:
+        pytest.fail(
+            "Expected no warning to be printed"
+        )  # assert that no warning is printed
