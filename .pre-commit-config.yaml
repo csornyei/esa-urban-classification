@@ -1,24 +1,28 @@
 repos:
-
--   repo: https://github.com/pre-commit/pre-commit-hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.4.0
     hooks:
-    -   id: check-merge-conflict
-    -   id: check-yaml
-        args: ['--unsafe']
+      - id: check-merge-conflict
+      - id: check-yaml
+        args: ["--unsafe"]
 
--   repo: https://github.com/psf/black
+  - repo: https://github.com/psf/black
     rev: 23.9.1
     hooks:
-    -   id: black
+      - id: black
 
--   repo: https://github.com/pycqa/isort
+  - repo: https://github.com/pycqa/isort
     rev: 5.12.0
     hooks:
-    -   id: isort
+      - id: isort
         args: ["--profile", "black", "--filter-files"]
 
--   repo: https://github.com/charliermarsh/ruff-pre-commit 
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
     rev: v0.0.290
     hooks:
-    -   id: ruff
+      - id: ruff
+
+  - repo: https://github.com/pytest-dev/pytest
+    rev: v7.4.2
+    hooks:
+      - id: pytest
