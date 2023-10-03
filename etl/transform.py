@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
 import geopandas as gpd
 import numpy as np
@@ -65,40 +65,49 @@ def _reproject_images(dataset, dst_crs):
     return reprojected_data, transform
 
 
+def _calculate_merged_images(
+    datasets: List[rasterio.io.DatasetReader], crs: rasterio.crs.CRS
+) -> Tuple[np.ndarray, rasterio.Affine, Dict]:
+    reprojected_data = []
+
+    for dataset in datasets:
+        if dataset.crs != crs:
+            data, transform = _reproject_images(dataset, crs)
+            reprojected_dataset = rasterio.MemoryFile().open(
+                driver="GTiff",
+                height=data.shape[1],
+                width=data.shape[2],
+                count=data.shape[0],
+                dtype=data.dtype,
+                crs=crs,
+                transform=transform,
+                nodata=dataset.nodata,
+            )
+            reprojected_dataset.write(data)
+            reprojected_data.append(reprojected_dataset)
+        else:
+            reprojected_data.append(dataset)
+
+    merged, out_transform = merge(reprojected_data)
+
+    out_meta = datasets[0].meta.copy()
+    out_meta.update(
+        {
+            "height": merged.shape[1],
+            "width": merged.shape[2],
+            "transform": out_transform,
+        }
+    )
+
+    return merged, out_transform, out_meta
+
+
 def merge_images(input_folder: Path, output_path: Path) -> None:
     try:
         datasets = [rasterio.open(f) for f in input_folder.iterdir()]
         crs = datasets[0].crs
-        reprojected_data = []
 
-        for dataset in datasets:
-            if dataset.crs != crs:
-                data, transform = _reproject_images(dataset, crs)
-                reprojected_dataset = rasterio.MemoryFile().open(
-                    driver="GTiff",
-                    height=data.shape[1],
-                    width=data.shape[2],
-                    count=data.shape[0],
-                    dtype=data.dtype,
-                    crs=crs,
-                    transform=transform,
-                    nodata=dataset.nodata,
-                )
-                reprojected_dataset.write(data)
-                reprojected_data.append(reprojected_dataset)
-            else:
-                reprojected_data.append(dataset)
-
-        merged, out_transform = merge(reprojected_data)
-
-        out_meta = datasets[0].meta.copy()
-        out_meta.update(
-            {
-                "height": merged.shape[1],
-                "width": merged.shape[2],
-                "transform": out_transform,
-            }
-        )
+        merged, out_transform, out_meta = _calculate_merged_images(datasets, crs)
 
         with rasterio.open(output_path, "w", **out_meta) as dest:
             dest.write(merged)
