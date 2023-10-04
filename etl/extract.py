@@ -20,7 +20,14 @@ def _get_date():
 def get_available_products(api: SentinelAPI, footprint_path: Path) -> list:
     footprint = geojson_to_wkt(read_geojson(footprint_path))
     start_date, end_date = _get_date()
-    products = query(api, footprint, start_date, end_date, cloudcoverpercentage=(0, 50))
+    try:
+        products = query(
+            api, footprint, start_date, end_date, cloudcoverpercentage=(0, 50)
+        )
+        print(f"API Response: {products}")
+    except Exception as e:
+        print(f"Error occurred during API call: {e}")
+        products = {}
 
     if len(products) == 0:
         raise ValueError("No products found")
