@@ -5,6 +5,14 @@ from etl.extract import _calculate_intersecting_products
 
 
 def test__calculate_intersecting_products_no_intersecting_products():
+    products_gdf = pd.DataFrame(
+        {
+            "geometry": [
+                "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))",
+                "POLYGON ((2 2, 3 2, 3 3, 2 3, 2 2))",
+            ]
+        }
+    )
     # the resulting gdf should be empty
     test_case = [
         {"geometry": "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))"},
@@ -26,6 +34,14 @@ def test__calculate_intersecting_products_no_intersecting_products():
 
 
 def test__calculate_intersecting_products_not_covering_whole_footprint(caplog):
+    products_gdf = pd.DataFrame(
+        {
+            "geometry": [
+                "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))",
+                "POLYGON ((2 2, 3 2, 3 3, 2 3, 2 2))",
+            ]
+        }
+    )
     # the resulting gdf should contains some rows
     # it should also print a warning
     # create a test case where
@@ -54,6 +70,14 @@ def test__calculate_intersecting_products_not_covering_whole_footprint(caplog):
 
 
 def test__calculate_intersecting_products_covering_whole_footprint(caplog):
+    products_gdf = pd.DataFrame(
+        {
+            "geometry": [
+                "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))",
+                "POLYGON ((2 2, 3 2, 3 3, 2 3, 2 2))",
+            ]
+        }
+    )
     # the resulting gdf should contains some rows
     # it should not print a warning
     test_case = (
