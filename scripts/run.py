@@ -1,5 +1,6 @@
 import argparse
 import glob
+import shutil
 from pathlib import Path
 
 from api.sentinel_api import init_api
@@ -29,6 +30,7 @@ def run(geojson_files):
 
         download_dir_path = folder / "data" / geojson_file
         if not download_dir_path.exists():
+            shutil.rmtree(download_dir_path)
             download_dir_path.mkdir(parents=True)
 
         download_and_unzip_files(api, products, download_dir_path)

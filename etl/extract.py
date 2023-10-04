@@ -14,7 +14,7 @@ def _get_date():
     end_date = date.today() - timedelta(days=5)
     start_date = end_date - timedelta(days=30)
 
-    return end_date.strftime("%Y%m%d"), start_date.strftime("%Y%m%d")
+    return start_date.strftime("%Y%m%d"), end_date.strftime("%Y%m%d")
 
 
 def get_available_products(api: SentinelAPI, footprint_path: Path) -> list:
@@ -49,7 +49,7 @@ def _calculate_intersecting_products(
     remaining_aoi = footprint_aoi
     intersecting_products = []
 
-    for index, product in products_gdf.iterrows():
+    for _, product in products_gdf.iterrows():
         intersection = remaining_aoi.intersection(product["geometry"])
 
         if intersection.area == 0:
