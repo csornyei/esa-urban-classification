@@ -139,12 +139,14 @@ def generate_tci_image(
     green_band = _stretch_8bit(green)
     blue_band = _stretch_8bit(blue)
 
-    tci = np.dstack((red_band, green_band, blue_band))
+    np.dstack((red_band, green_band, blue_band))
 
     meta.update(count=3, dtype=np.uint8)
 
     with rasterio.open(output_path, "w", **meta) as dst:
-        dst.write(tci)
-    print(f"Red band: {red_band}")
-    print(f"Green band: {green_band}")
-    print(f"Blue band: {blue_band}")
+        dst.write(red_band, 1)
+        dst.write(green_band, 2)
+        dst.write(blue_band, 3)
+    print(f"Red band shape: {red_band.shape}")
+    print(f"Green band shape: {green_band.shape}")
+    print(f"Blue band shape: {blue_band.shape}")
