@@ -13,6 +13,8 @@ from api.sentinel_api import download, query
 def _get_date():
     end_date = date.today() - timedelta(days=5)
     start_date = end_date - timedelta(days=30)
+    print(f"Start date: {start_date}")
+    print(f"End date: {end_date}")
 
     return end_date.strftime("%Y%m%d"), start_date.strftime("%Y%m%d")
 
@@ -20,9 +22,17 @@ def _get_date():
 def get_available_products(api: SentinelAPI, footprint_path: Path) -> list:
     footprint = geojson_to_wkt(read_geojson(footprint_path))
     start_date, end_date = _get_date()
+    cloudcoverpercentage = (0, 50)
+    print(
+        f"Query parameters: {api}, {footprint}, {start_date}, {end_date}, {cloudcoverpercentage}"
+    )
     try:
         products = query(
-            api, footprint, start_date, end_date, cloudcoverpercentage=(0, 50)
+            api,
+            footprint,
+            start_date,
+            end_date,
+            cloudcoverpercentage=cloudcoverpercentage,
         )
         print(f"API Response: {products}")
     except Exception as e:
