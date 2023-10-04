@@ -19,7 +19,7 @@ def _get_date():
 
 def get_available_products(api: SentinelAPI, footprint_path: Path) -> list:
     footprint = geojson_to_wkt(read_geojson(footprint_path))
-    end_date, start_date = _get_date()
+    start_date, end_date = _get_date()
     products = query(api, footprint, start_date, end_date, cloudcoverpercentage=(0, 50))
 
     if len(products) == 0:
@@ -76,7 +76,8 @@ def _calculate_intersecting_products(
 
     if remaining_aoi.area > 0:
         print(
-            "WARNING: There are still areas of interest that are not covered by the available products"
+            "WARNING: There are still areas of interest"
+            + "that are not covered by the available products"
         )
 
     return gpd.GeoDataFrame(intersecting_products, crs="EPSG:4326")
