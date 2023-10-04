@@ -26,8 +26,7 @@ def get_available_products(api: SentinelAPI, footprint_path: Path) -> list:
         )
         print(f"API Response: {products}")
     except Exception as e:
-        print(f"Error occurred during API call: {e}")
-        products = {}
+        raise Exception(f"Error occurred during API call: {e}") from e
 
     if len(products) == 0:
         raise ValueError("No products found")
@@ -56,8 +55,8 @@ def _calculate_intersecting_products(
     remaining_aoi = footprint_aoi
     intersecting_products = []
 
-    for index, product in products_gdf.iterrows():
-        intersection = remaining_aoi.intersection(product["geometry"])
+    for product in products_gdf.itertuples():
+        intersection = remaining_aoi.intersection(product.geometry)
 
         if intersection.area == 0:
             continue
@@ -101,8 +100,10 @@ def download_and_unzip_files(
 
 
 def gather_img_paths(
-    download_dir: Path, important_bands: List[str] = ["B02", "B03", "B04", "B08"]
+    download_dir: Path, important_bands: List[str] = None
 ) -> List[Path]:
+    if important_bands is None:
+        important_bands = ["B02", "B03", "B04", "B08"]
     image_paths = []
 
     for downloaded_dir in download_dir.iterdir():
