@@ -122,14 +122,6 @@ def _stretch_8bit(band: np.ndarray) -> np.ndarray:
     # Stretch the band values to 8-bit (0-255) range
     band_min, band_max = np.percentile(band, (2, 98))
     return ((band - band_min) / (band_max - band_min) * 255).astype(np.uint8)
-    a = 0  # target minimum
-    b = 255  # target maximum
-    c = np.percentile(band, 2)  # actual minimum
-    d = np.percentile(band, 98)  # actual maximum
-    stretched = (band - c) * ((b - a) / (d - c)) + a
-    stretched[stretched < a] = a
-    stretched[stretched > b] = b
-    return stretched.astype(np.uint8)
 
 
 def generate_tci_image(
