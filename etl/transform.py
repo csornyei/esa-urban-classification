@@ -145,3 +145,6 @@ def generate_tci_image(
 
     with rasterio.open(output_path, "w", **meta) as dst:
         dst.write(tci)
+    print(f"Red band: {red_band}")
+    print(f"Green band: {green_band}")
+    print(f"Blue band: {blue_band}")
