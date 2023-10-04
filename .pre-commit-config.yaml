@@ -21,8 +21,3 @@ repos:
     rev: v0.0.290
     hooks:
       - id: ruff
-
-  - repo: https://github.com/pytest-dev/pytest
-    rev: v7.4.2
-    hooks:
-      - id: pytest

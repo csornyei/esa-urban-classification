@@ -1,7 +1,7 @@
 import numpy as np
 from PIL import Image
 
-from etl.transform import calculate_cropped_image, generate_tci_image
+from etl.transform import _calculate_cropped_image, generate_tci_image
 
 
 def test__calculate_cropped_image_crops_correctly():
@@ -9,7 +9,7 @@ def test__calculate_cropped_image_crops_correctly():
     test_image = np.random.randint(0, 255, (100, 100, 3)).astype("uint8")
     test_crop_box = (25, 25, 75, 75)
     expected_result = Image.fromarray(test_image).crop(test_crop_box)
-    result = calculate_cropped_image(test_image, test_crop_box)
+    result = _calculate_cropped_image(test_image, test_crop_box)
     np.testing.assert_array_equal(result, expected_result)
 
 
@@ -18,7 +18,7 @@ def test__calculate_cropped_image_no_intersection():
     test_image = np.random.randint(0, 255, (100, 100, 3)).astype("uint8")
     test_crop_box = (101, 101, 200, 200)
     expected_result = Image.new("RGB", (0, 0))
-    result = calculate_cropped_image(test_image, test_crop_box)
+    result = _calculate_cropped_image(test_image, test_crop_box)
     np.testing.assert_array_equal(result, expected_result)
 
 
