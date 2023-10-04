@@ -63,9 +63,9 @@ def _calculate_intersecting_products(
             break
 
     if remaining_aoi.area > 0:
+        uncovered_areas = remaining_aoi
         print(
-            "WARNING: There are still areas of interest"
-            + "that are not covered by the available products"
+            f"WARNING: The following areas of interest are not covered by the available products: {uncovered_areas}"
         )
 
     return gpd.GeoDataFrame(intersecting_products, crs="EPSG:4326")
