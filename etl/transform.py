@@ -149,4 +149,4 @@ def generate_tci_image(
     meta.update(count=3, dtype=np.uint8)
 
     with rasterio.open(output_path, "w", **meta) as dst:
-        dst.write(tci)
+        dst.write(tci.transpose((2, 0, 1)))
