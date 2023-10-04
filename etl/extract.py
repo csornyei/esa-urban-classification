@@ -16,7 +16,7 @@ def _get_date():
     print(f"Start date: {start_date}")
     print(f"End date: {end_date}")
 
-    return end_date.strftime("%Y%m%d"), start_date.strftime("%Y%m%d")
+    return start_date.strftime("%Y%m%d"), end_date.strftime("%Y%m%d")
 
 
 def get_available_products(api: SentinelAPI, footprint_path: Path) -> list:
