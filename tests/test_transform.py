@@ -6,7 +6,10 @@ from etl.transform import _calculate_cropped_image, generate_tci_image
 
 def test__calculate_cropped_image_crops_correctly():
     # the resulting image should be cropped correctly
-    test_image = np.random.randint(0, 255, (100, 100, 3)).astype("uint8")
+    from unittest.mock import Mock
+
+    test_image = Mock()
+    test_image.crs = {"init": "epsg:4326"}
     test_crop_box = (25, 25, 75, 75)
     expected_result = Image.fromarray(test_image).crop(test_crop_box)
     result = _calculate_cropped_image(test_image, test_crop_box)
@@ -15,7 +18,10 @@ def test__calculate_cropped_image_crops_correctly():
 
 def test__calculate_cropped_image_no_intersection():
     # the resulting image should be empty
-    test_image = np.random.randint(0, 255, (100, 100, 3)).astype("uint8")
+    from unittest.mock import Mock
+
+    test_image = Mock()
+    test_image.crs = {"init": "epsg:4326"}
     test_crop_box = (101, 101, 200, 200)
     expected_result = Image.new("RGB", (0, 0))
     result = _calculate_cropped_image(test_image, test_crop_box)
