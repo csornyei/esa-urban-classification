@@ -1,7 +1,7 @@
 import zipfile
 from datetime import date, timedelta
 from pathlib import Path
-from typing import List
+from typing import List, Dict
 
 import geopandas as gpd
 from sentinelsat import SentinelAPI, geojson_to_wkt, read_geojson
@@ -95,7 +95,7 @@ def download_and_unzip_files(
 
 def gather_img_paths(
     download_dir: Path, important_bands: List[str] = ["B02", "B03", "B04", "B08"]
-) -> List[Path]:
+) -> Dict[str, Dict[str, Path]]:
     image_paths = []
 
     for downloaded_dir in download_dir.iterdir():
@@ -105,7 +105,18 @@ def gather_img_paths(
         image_globs = list(downloaded_dir.glob("GRANULE/**/IMG_DATA/*.jp2"))
 
         for image_path in image_globs:
-            if image_path.stem.split("_")[2] in important_bands:
-                image_paths.append(image_path)
+            prod_id, _date, band, *_ = image_path.stem.split("_")
+            if band in important_bands:
+                image_paths.append((image_path, prod_id, band))
+            if len(_) > 0:
+                print("Warning: ", image_path)
 
-    return image_paths
+    image_paths_by_prod_id = {}
+
+    for image_path, prod_id, band in image_paths:
+        if prod_id not in image_paths_by_prod_id:
+            image_paths_by_prod_id[prod_id] = {}
+
+        image_paths_by_prod_id[prod_id][band] = image_path
+
+    return image_paths_by_prod_id
