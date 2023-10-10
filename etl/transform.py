@@ -11,7 +11,7 @@ from rasterio.warp import Resampling, calculate_default_transform, reproject
 
 def _calculate_cropped_image(
     footprint_gdf: gpd.GeoDataFrame, img_src: rasterio.io.DatasetReader
-) -> Tuple[np.ndarray, Dict]:
+) -> Tuple[np.ndarray, Dict, rasterio.windows.Window]:
     crs = img_src.crs
     footprint_gdf = footprint_gdf.to_crs(crs)
 
@@ -30,17 +30,37 @@ def _calculate_cropped_image(
         }
     )
 
-    return subset, profile
+    return subset, profile, window
 
 
 def crop_image_to_footprint(
     footprint_path: Path, image_path: Path, output_path: Path
-) -> None:
+) -> rasterio.windows.Window:
     footprint_gdf = gpd.read_file(footprint_path)
 
     with rasterio.open(image_path) as img_src:
-        subset, profile = _calculate_cropped_image(footprint_gdf, img_src)
+        subset, profile, window = _calculate_cropped_image(footprint_gdf, img_src)
 
+    with rasterio.open(output_path, "w", **profile) as dst:
+        dst.write(subset)
+
+    return window
+
+
+def crop_image_with_window(
+    window: rasterio.windows.Window, image_path: Path, output_path: Path
+) -> None:
+    with rasterio.open(image_path) as img_src:
+        subset = img_src.read(window=window)
+        profile = img_src.profile
+        profile.update(
+            {
+                "height": subset.shape[1],
+                "width": subset.shape[2],
+                "transform": rasterio.windows.transform(window, img_src.transform),
+            }
+        )
+    
     with rasterio.open(output_path, "w", **profile) as dst:
         dst.write(subset)
 
@@ -103,8 +123,10 @@ def _calculate_merged_images(
 
 
 def merge_images(input_folder: Path, output_path: Path) -> None:
+    datasets = []
     try:
-        datasets = [rasterio.open(f) for f in input_folder.iterdir()]
+        for f in input_folder.iterdir():
+            datasets.append(rasterio.open(f))
         crs = datasets[0].crs
 
         merged, out_transform, out_meta = _calculate_merged_images(datasets, crs)
