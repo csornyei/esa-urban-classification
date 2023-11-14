@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import List
 
 from api.sentinel_api import init_api
+from api.secrets import create_client, read_secret
 from etl.extract import (
     download_and_unzip_files,
     gather_img_paths,
@@ -13,19 +14,26 @@ from etl.extract import (
     get_intersecting_products,
 )
 from etl.transform import (
-    crop_image_to_footprint, 
-    crop_image_with_window, 
+    crop_image_to_footprint,
+    crop_image_with_window,
     merge_images,
-    generate_tci_image
+    generate_tci_image,
 )
+from utils.env import VAULT_ADDR, VAULT_TOKEN
 
 
 def run(geojson_files: List[str], generate_tci: bool):
     folder = Path(__file__).parent.parent
-    api = init_api(folder / ".env")
+
+    client = create_client(url=VAULT_ADDR, token=VAULT_TOKEN)
+
+    secret = read_secret(client=client, path="data/scihub")
+
+    api = init_api(secret["USERNAME"], secret["PASSWORD"])
+
     important_bands = ["B02", "B03", "B04", "B08", "TCI"]
 
-    for geojson_file in geojson_files: 
+    for geojson_file in geojson_files:
         try:
             print(f"Processing {geojson_file}.geojson")
             geojson_path = folder / "footprints" / f"{geojson_file}.geojson"
@@ -44,8 +52,7 @@ def run(geojson_files: List[str], generate_tci: bool):
 
             download_and_unzip_files(api, products, download_dir_path)
             image_paths_by_prod_id = gather_img_paths(
-                download_dir_path, 
-                important_bands
+                download_dir_path, important_bands
             )
 
             # create folders for cropped results
@@ -98,7 +105,7 @@ def run(geojson_files: List[str], generate_tci: bool):
                     cropped_images_dir / "merged_B02.tif",
                     cropped_images_dir / "merged_generated_tci.tif",
                 )
-            
+
             # move everything to results folder
             results_dir_path = folder / "data" / geojson_file / "results"
             if results_dir_path.exists():
@@ -118,6 +125,7 @@ def run(geojson_files: List[str], generate_tci: bool):
                 print(e)
                 print(f"Error processing {geojson_file}.geojson")
                 continue
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
