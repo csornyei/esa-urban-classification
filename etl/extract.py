@@ -12,7 +12,7 @@ from api.sentinel_api import download, query
 
 def _get_date():
     end_date = date.today() - timedelta(days=5)
-    start_date = end_date - timedelta(days=30)
+    start_date = end_date - timedelta(days=20)
 
     return start_date.strftime("%Y%m%d"), end_date.strftime("%Y%m%d")
 
@@ -65,7 +65,7 @@ def _calculate_intersecting_products(
     if remaining_aoi.area > 0:
         print(
             "WARNING: There are still areas of interest"
-            + "that are not covered by the available products"
+            ,"that are not covered by the available products"
         )
 
     return gpd.GeoDataFrame(intersecting_products, crs="EPSG:4326")

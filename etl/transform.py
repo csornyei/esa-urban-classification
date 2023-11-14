@@ -135,6 +135,7 @@ def merge_images(input_folder: Path, output_path: Path) -> None:
             dest.write(merged)
     except Exception as e:
         print(f"merge_images: {e}")
+        raise e
     finally:
         for dataset in datasets:
             dataset.close()
