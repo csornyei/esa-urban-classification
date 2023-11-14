@@ -1,140 +1,82 @@
 import argparse
-import glob
 import shutil
-import tqdm
 from pathlib import Path
 from typing import List
 
-from api.sentinel_api import init_api
-from api.secrets import create_client, read_secret
+from tqdm import tqdm
+import geopandas as gpd
+
 from etl.extract import (
-    download_and_unzip_files,
-    gather_img_paths,
-    get_available_products,
-    get_intersecting_products,
+    create_config,
+    get_bbox_from_polygon,
+    get_bbox_size,
+    request_true_color_image,
 )
-from etl.transform import (
-    crop_image_to_footprint,
-    crop_image_with_window,
-    merge_images,
-    generate_tci_image,
-)
+from etl.transform import split_image_to_squares
+from utils.secrets import create_client, read_secret
 from utils.env import VAULT_ADDR, VAULT_TOKEN
 
 
-def run(geojson_files: List[str], generate_tci: bool):
+def run(city_names: List[str]):
     folder = Path(__file__).parent.parent
 
     client = create_client(url=VAULT_ADDR, token=VAULT_TOKEN)
 
     secret = read_secret(client=client, path="data/scihub")
 
-    api = init_api(secret["USERNAME"], secret["PASSWORD"])
+    config = create_config(
+        client_id=secret["CLIENT_ID"],
+        client_secret=secret["CLIENT_SECRET"],
+    )
 
-    important_bands = ["B02", "B03", "B04", "B08", "TCI"]
+    footprints = gpd.read_file(folder / "footprints.geojson")
 
-    for geojson_file in geojson_files:
-        try:
-            print(f"Processing {geojson_file}.geojson")
-            geojson_path = folder / "footprints" / f"{geojson_file}.geojson"
-            if not geojson_path.exists():
-                raise FileNotFoundError(
-                    f"{geojson_file}.geojson does not exist in the footprints directory."
-                )
+    if len(city_names) != 0:
+        footprints = footprints[footprints["name"].isin(city_names)]
 
-            products = get_available_products(api, geojson_path)
-            products = get_intersecting_products(geojson_path, products)
+    for _, row in tqdm(footprints.iterrows(), total=len(footprints), desc="Cities"):
+        name, geometry = row["name"], row["geometry"]
 
-            download_dir_path = folder / "data" / geojson_file / "raw"
-            if download_dir_path.exists():
-                shutil.rmtree(download_dir_path)
-            download_dir_path.mkdir(parents=True)
+        bbox = get_bbox_from_polygon(geometry)
 
-            download_and_unzip_files(api, products, download_dir_path)
-            image_paths_by_prod_id = gather_img_paths(
-                download_dir_path, important_bands
+        size = get_bbox_size(bbox)
+
+        data_folder = folder / "data" / name.lower() / "raw"
+
+        print(f"Downloading data for {name}")
+        request_true_color_image(
+            config=config,
+            bbox=bbox,
+            size=size,
+            data_folder=data_folder,
+        )
+
+        raw_tif_paths = data_folder.glob("**/*.tiff")
+
+        splits_folder = folder / "data" / name.lower() / "splits"
+
+        if splits_folder.exists():
+            shutil.rmtree(splits_folder)
+        splits_folder.mkdir(parents=True)
+
+        print(f"Splitting images for {name}")
+        for raw_tif_path in raw_tif_paths:
+            split_image_to_squares(
+                raw_tif_path,
+                splits_folder,
+                square_size=25,
             )
-
-            # create folders for cropped results
-            cropped_images_dir = download_dir_path / "cropped"
-            if not cropped_images_dir.exists():
-                cropped_images_dir.mkdir(parents=True)
-
-            for band in important_bands:
-                p = cropped_images_dir / band
-                if not p.exists():
-                    p.mkdir(parents=True)
-
-            for project, content in tqdm.tqdm(
-                image_paths_by_prod_id.items(), desc="Cropping images", position=0
-            ):
-                window = None
-                for band, image_path in tqdm.tqdm(
-                    content.items(), desc=f"Project {project}", position=1, leave=False
-                ):
-                    if window is None:
-                        window = crop_image_to_footprint(
-                            geojson_path,
-                            image_path,
-                            cropped_images_dir
-                            / band
-                            / f"{image_path.stem}_cropped{image_path.suffix}",
-                        )
-                    else:
-                        crop_image_with_window(
-                            window,
-                            image_path,
-                            cropped_images_dir
-                            / band
-                            / f"{image_path.stem}_cropped{image_path.suffix}",
-                        )
-
-            # create folder for merged results
-            merged_images_dir = download_dir_path / "merged"
-            if not merged_images_dir.exists():
-                merged_images_dir.mkdir(parents=True)
-
-            for dir in cropped_images_dir.iterdir():
-                merge_images(dir, merged_images_dir / f"merged_{dir.stem}.tif")
-
-            if generate_tci:
-                print("Generating TCI image")
-                generate_tci_image(
-                    cropped_images_dir / "merged_B04.tif",
-                    cropped_images_dir / "merged_B03.tif",
-                    cropped_images_dir / "merged_B02.tif",
-                    cropped_images_dir / "merged_generated_tci.tif",
-                )
-
-            # move everything to results folder
-            results_dir_path = folder / "data" / geojson_file / "results"
-            if results_dir_path.exists():
-                shutil.rmtree(results_dir_path)
-            results_dir_path.mkdir(parents=True)
-
-            for file in merged_images_dir.iterdir():
-                shutil.move(file, results_dir_path)
-
-            # clean up data folder
-            shutil.rmtree(download_dir_path)
-
-        except Exception as e:
-            if len(geojson_files) == 1:
-                raise Exception(f"Error processing {geojson_file}.geojson") from e
-            else:
-                print(e)
-                print(f"Error processing {geojson_file}.geojson")
-                continue
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-g", "--geojson", help="Name of the geojson file to process")
-    parser.add_argument("--tci", help="Generate TCI image", action="store_true")
+    parser.add_argument(
+        "-c", "--cities", help="Name of the cities to process separated by comma"
+    )
     args = parser.parse_args()
 
-    if args.geojson:
-        run([args.geojson], args.tci)
+    if args.cities:
+        cities = args.cities.split(",")
+        run(cities)
     else:
-        geojson_files = [Path(f).stem for f in glob.glob("footprints/*.geojson")]
-        run(geojson_files, args.tci)
+        run([])

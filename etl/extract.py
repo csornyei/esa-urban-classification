@@ -1,122 +1,85 @@
-import zipfile
-from datetime import date, timedelta
 from pathlib import Path
-from typing import List, Dict
+from datetime import date, timedelta
 
-import geopandas as gpd
-from sentinelsat import SentinelAPI, geojson_to_wkt, read_geojson
-from shapely import wkt
+from sentinelhub import (
+    SHConfig,
+    CRS,
+    BBox,
+    DataCollection,
+    MimeType,
+    MosaickingOrder,
+    SentinelHubRequest,
+    bbox_to_dimensions,
+)
+from shapely import Polygon
 
-from api.sentinel_api import download, query
+
+def create_config(client_id: str, client_secret: str) -> SHConfig:
+    config = SHConfig()
+
+    config.sh_client_id = client_id
+    config.sh_client_secret = client_secret
+
+    return config
 
 
-def _get_date():
-    end_date = date.today() - timedelta(days=5)
-    start_date = end_date - timedelta(days=20)
+def get_bbox_from_polygon(polygon: Polygon) -> BBox:
+    coords = polygon.bounds
+    return BBox(bbox=coords, crs=CRS.WGS84)
+
+
+def get_bbox_size(bbox: BBox, resolution: int = 10) -> tuple:
+    w, h = bbox_to_dimensions(bbox=bbox, resolution=resolution)
+    w = min(w, 2500)
+    h = min(h, 2500)
+    return (w, h)
+
+
+def _get_time_interval():
+    end_date = date.today().replace(day=1)
+    start_date = end_date - timedelta(days=30)
 
     return start_date.strftime("%Y%m%d"), end_date.strftime("%Y%m%d")
 
 
-def get_available_products(api: SentinelAPI, footprint_path: Path) -> list:
-    footprint = geojson_to_wkt(read_geojson(footprint_path))
-    start_date, end_date = _get_date()
-    products = query(api, footprint, start_date, end_date, cloudcoverpercentage=(0, 50))
-
-    if len(products) == 0:
-        raise ValueError("No products found")
-
-    products_rows = []
-
-    for product_id, product_info in products.items():
-        row = {
-            "id": product_id,
-            "date": product_info["beginposition"],
-            "geometry": wkt.loads(product_info["footprint"]),
-            "cloudcoverpercentage": product_info["cloudcoverpercentage"],
-            "size": product_info["size"],
-        }
-
-        products_rows.append(row)
-
-    products_rows = sorted(products_rows, key=lambda k: k["cloudcoverpercentage"])
-
-    return gpd.GeoDataFrame(products_rows, geometry="geometry", crs="EPSG:4326")
-
-
-def _calculate_intersecting_products(
-    footprint_aoi: wkt, products_gdf: gpd.GeoDataFrame
-) -> gpd.GeoDataFrame:
-    remaining_aoi = footprint_aoi
-    intersecting_products = []
-
-    for _, product in products_gdf.iterrows():
-        intersection = remaining_aoi.intersection(product["geometry"])
-
-        if intersection.area == 0:
-            continue
-
-        remaining_aoi = remaining_aoi.difference(intersection)
-
-        intersecting_products.append(product)
-
-        if remaining_aoi.area == 0:
-            break
-
-    if remaining_aoi.area > 0:
-        print(
-            "WARNING: There are still areas of interest"
-            ,"that are not covered by the available products"
-        )
-
-    return gpd.GeoDataFrame(intersecting_products, crs="EPSG:4326")
-
-
-def get_intersecting_products(
-    footprint_path: Path, products_gdf: gpd.GeoDataFrame
-) -> gpd.GeoDataFrame:
-    footprint = geojson_to_wkt(read_geojson(footprint_path))
-    footprint_aoi = wkt.loads(footprint)
-    return _calculate_intersecting_products(footprint_aoi, products_gdf)
-
-
-def download_and_unzip_files(
-    api: SentinelAPI, products_gdf: gpd.GeoDataFrame, download_dir: Path
+def request_true_color_image(
+    config: SHConfig, bbox: BBox, size: tuple, data_folder: Path
 ) -> None:
-    download(api, products_gdf["id"].tolist(), download_dir)
+    evalscript_tci = """
+    //VERSION=3
 
-    zip_files = [f for f in download_dir.iterdir() if f.suffix == ".zip"]
+    function setup() {
+        return {
+            input: [{
+                bands: ["B02", "B03", "B04", "B08"],
+                units: "DN"
+            }],
+            output: {
+                bands: 4,
+                sampleType: "INT16"
+            }
+        };
+    }
 
-    for zip_file in zip_files:
-        with zipfile.ZipFile(zip_file, "r") as zip_ref:
-            zip_ref.extractall(download_dir)
+    function evaluatePixel(sample) {
+        return [sample.B04, sample.B03, sample.B02, sample.B08];
+    }
+    """
 
-        zip_file.unlink()
+    request = SentinelHubRequest(
+        data_folder=data_folder,
+        evalscript=evalscript_tci,
+        input_data=[
+            SentinelHubRequest.input_data(
+                data_collection=DataCollection.SENTINEL2_L2A,
+                time_interval=_get_time_interval(),
+                mosaicking_order=MosaickingOrder.LEAST_CC,
+            )
+        ],
+        responses=[SentinelHubRequest.output_response("default", MimeType.TIFF)],
+        bbox=bbox,
+        size=size,
+        config=config,
+    )
 
-
-def gather_img_paths(
-    download_dir: Path, important_bands: List[str] = ["B02", "B03", "B04", "B08"]
-) -> Dict[str, Dict[str, Path]]:
-    image_paths = []
-
-    for downloaded_dir in download_dir.iterdir():
-        if downloaded_dir.is_file():
-            continue
-
-        image_globs = list(downloaded_dir.glob("GRANULE/**/IMG_DATA/*.jp2"))
-
-        for image_path in image_globs:
-            prod_id, _date, band, *_ = image_path.stem.split("_")
-            if band in important_bands:
-                image_paths.append((image_path, prod_id, band))
-            if len(_) > 0:
-                print("Warning: ", image_path)
-
-    image_paths_by_prod_id = {}
-
-    for image_path, prod_id, band in image_paths:
-        if prod_id not in image_paths_by_prod_id:
-            image_paths_by_prod_id[prod_id] = {}
-
-        image_paths_by_prod_id[prod_id][band] = image_path
-
-    return image_paths_by_prod_id
+    request.get_data(save_data=True)

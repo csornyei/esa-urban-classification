@@ -1,175 +1,70 @@
 from pathlib import Path
-from typing import Dict, List, Tuple
 
-import geopandas as gpd
 import numpy as np
 import rasterio
-from rasterio.features import geometry_window
-from rasterio.merge import merge
-from rasterio.warp import Resampling, calculate_default_transform, reproject
+from rasterio.windows import Window
 
 
-def _calculate_cropped_image(
-    footprint_gdf: gpd.GeoDataFrame, img_src: rasterio.io.DatasetReader
-) -> Tuple[np.ndarray, Dict, rasterio.windows.Window]:
-    crs = img_src.crs
-    footprint_gdf = footprint_gdf.to_crs(crs)
-
-    footprint_geometry = footprint_gdf["geometry"]
-
-    window = geometry_window(img_src, footprint_geometry)
-
-    subset = img_src.read(window=window)
-
-    profile = img_src.profile
-    profile.update(
-        {
-            "height": subset.shape[1],
-            "width": subset.shape[2],
-            "transform": rasterio.windows.transform(window, img_src.transform),
-        }
-    )
-
-    return subset, profile, window
-
-
-def crop_image_to_footprint(
-    footprint_path: Path, image_path: Path, output_path: Path
-) -> rasterio.windows.Window:
-    footprint_gdf = gpd.read_file(footprint_path)
-
-    with rasterio.open(image_path) as img_src:
-        subset, profile, window = _calculate_cropped_image(footprint_gdf, img_src)
-
-    with rasterio.open(output_path, "w", **profile) as dst:
-        dst.write(subset)
-
-    return window
-
-
-def crop_image_with_window(
-    window: rasterio.windows.Window, image_path: Path, output_path: Path
+def split_image_to_squares(
+    image: Path,
+    output_dir: Path,
+    square_size: int = 25,
 ) -> None:
-    with rasterio.open(image_path) as img_src:
-        subset = img_src.read(window=window)
-        profile = img_src.profile
-        profile.update(
-            {
-                "height": subset.shape[1],
-                "width": subset.shape[2],
-                "transform": rasterio.windows.transform(window, img_src.transform),
-            }
-        )
-    
-    with rasterio.open(output_path, "w", **profile) as dst:
-        dst.write(subset)
+    with rasterio.open(image) as src:
+        metadata = src.meta
+        transform = src.transform
 
+        image = src.read()
 
-def _reproject_images(dataset, dst_crs):
-    transform, width, height = calculate_default_transform(
-        dataset.crs, dst_crs, dataset.width, dataset.height, *dataset.bounds
-    )
-    reprojected_data = np.empty((dataset.count, height, width), dtype=dataset.dtypes[0])
+        num_bands, height, width = image.shape
 
-    for i in range(1, dataset.count + 1):
-        reproject(
-            source=rasterio.band(dataset, i),
-            destination=reprojected_data[i - 1],
-            src_transform=dataset.transform,
-            src_crs=dataset.crs,
-            dst_transform=transform,
-            dst_crs=dst_crs,
-            resampling=Resampling.nearest,
-        )
+        x_splits = width // square_size + (1 if width % square_size > 0 else 0)
+        y_splits = height // square_size + (1 if height % square_size > 0 else 0)
 
-    return reprojected_data, transform
-
-
-def _calculate_merged_images(
-    datasets: List[rasterio.io.DatasetReader], crs: rasterio.crs.CRS
-) -> Tuple[np.ndarray, rasterio.Affine, Dict]:
-    reprojected_data = []
-
-    for dataset in datasets:
-        if dataset.crs != crs:
-            data, transform = _reproject_images(dataset, crs)
-            reprojected_dataset = rasterio.MemoryFile().open(
-                driver="GTiff",
-                height=data.shape[1],
-                width=data.shape[2],
-                count=data.shape[0],
-                dtype=data.dtype,
-                crs=crs,
-                transform=transform,
-                nodata=dataset.nodata,
-            )
-            reprojected_dataset.write(data)
-            reprojected_data.append(reprojected_dataset)
-        else:
-            reprojected_data.append(dataset)
-
-    merged, out_transform = merge(reprojected_data)
-
-    out_meta = datasets[0].meta.copy()
-    out_meta.update(
-        {
-            "height": merged.shape[1],
-            "width": merged.shape[2],
-            "transform": out_transform,
+        metadata = {
+            **metadata,
+            "height": square_size,
+            "width": square_size,
+            "count": num_bands,
+            "driver": "GTiff",
+            "compress": "LZW",
         }
-    )
 
-    return merged, out_transform, out_meta
+        for i in range(x_splits):
+            for j in range(y_splits):
+                window = Window(
+                    i * square_size,
+                    j * square_size,
+                    min(square_size, width - i * square_size),
+                    min(square_size, height - j * square_size),
+                )
 
+                split_image = image[
+                    :,
+                    window.row_off : window.row_off + window.height,
+                    window.col_off : window.col_off + window.width,
+                ]
 
-def merge_images(input_folder: Path, output_path: Path) -> None:
-    datasets = []
-    try:
-        for f in input_folder.iterdir():
-            datasets.append(rasterio.open(f))
-        crs = datasets[0].crs
+                if (
+                    split_image.shape[1] < square_size
+                    or split_image.shape[2] < square_size
+                ):
+                    padding = (
+                        (0, 0),
+                        (0, square_size - split_image.shape[1]),
+                        (0, square_size - split_image.shape[2]),
+                    )
+                    split_image = np.pad(split_image, padding, mode="constant")
 
-        merged, out_transform, out_meta = _calculate_merged_images(datasets, crs)
+                new_transform = rasterio.windows.transform(window, transform)
 
-        with rasterio.open(output_path, "w", **out_meta) as dest:
-            dest.write(merged)
-    except Exception as e:
-        print(f"merge_images: {e}")
-        raise e
-    finally:
-        for dataset in datasets:
-            dataset.close()
+                metadata["transform"] = new_transform
 
-
-def _stretch_8bit(band: np.ndarray) -> np.ndarray:
-    a = 0  # target minimum
-    b = 255  # target maximum
-    c = np.percentile(band, 2)  # actual minimum
-    d = np.percentile(band, 98)  # actual maximum
-    stretched = (band - c) * ((b - a) / (d - c)) + a
-    stretched[stretched < a] = a
-    stretched[stretched > b] = b
-    return stretched.astype(np.uint8)
-
-
-def generate_tci_image(
-    red_band_path: Path, green_band_path: Path, blue_band_path: Path, output_path: Path
-) -> None:
-    with rasterio.open(red_band_path) as red_band:
-        red = red_band.read(1)
-        meta = red_band.meta
-    with rasterio.open(green_band_path) as green_band:
-        green = green_band.read(1)
-    with rasterio.open(blue_band_path) as blue_band:
-        blue = blue_band.read(1)
-
-    red_band = _stretch_8bit(red)
-    green_band = _stretch_8bit(green)
-    blue_band = _stretch_8bit(blue)
-
-    tci = np.dstack((red_band, green_band, blue_band))
-
-    meta.update(count=3, dtype=np.uint8)
-
-    with rasterio.open(output_path, "w", **meta) as dst:
-        dst.write(tci.transpose((2, 0, 1)))
+                file_path = output_dir / f"{i}_{j}.tif"
+                with rasterio.open(
+                    file_path,
+                    "w",
+                    **metadata,
+                ) as dst:
+                    for band in range(1, num_bands + 1):
+                        dst.write(split_image[band - 1, :, :], band)
