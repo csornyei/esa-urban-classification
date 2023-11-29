@@ -1,0 +1,7 @@
+[core]
+    autostage = true
+    remote = esa-urban-classifiaction-s3
+['remote "esa-urban-classifiaction-s3"']
+    url = s3://esa-urban-classification-data/
+    version_aware = false
+    region = eu-central-1

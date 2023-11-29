@@ -1,0 +1,6 @@
+outs:
+- md5: 4f5ff15abb86745e827680d0a5d03da4.dir
+  size: 7294912
+  nfiles: 802
+  hash: md5
+  path: zurich

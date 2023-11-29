@@ -1,0 +1,6 @@
+outs:
+- md5: 8ff5ed4edd84b4fe314aea316cd723da.dir
+  size: 92940315
+  nfiles: 10002
+  hash: md5
+  path: paris

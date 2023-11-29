@@ -16,6 +16,8 @@ black = "^23.9.1"
 isort = "^5.12.0"
 hvac = "^2.0.0"
 sentinelhub = "^3.9.4"
+dvc = "^3.30.3"
+dvc-s3 = "^2.23.0"
 
 
 [tool.poetry.group.dev.dependencies]

@@ -1,0 +1,6 @@
+outs:
+- md5: 6671184a3039af34ab56b489516ab970.dir
+  size: 35712652
+  nfiles: 3908
+  hash: md5
+  path: rome

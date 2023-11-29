@@ -1,0 +1,6 @@
+outs:
+- md5: b7f3f8f08f1267e0ba3b51ae68184bde.dir
+  size: 64390614
+  nfiles: 7374
+  hash: md5
+  path: amsterdam
