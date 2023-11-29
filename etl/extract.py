@@ -1,14 +1,14 @@
-from pathlib import Path
 from datetime import date, timedelta
+from pathlib import Path
 
 from sentinelhub import (
-    SHConfig,
     CRS,
     BBox,
     DataCollection,
     MimeType,
     MosaickingOrder,
     SentinelHubRequest,
+    SHConfig,
     bbox_to_dimensions,
 )
 from shapely import Polygon

@@ -1,5 +1,6 @@
-import hvac
 from typing import Dict
+
+import hvac
 
 
 def create_client(url: str, token: str) -> hvac.Client:
