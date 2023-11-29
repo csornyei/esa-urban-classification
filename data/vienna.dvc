@@ -1,0 +1,6 @@
+outs:
+- md5: df6710ebe5e88ce0c8f3ff585b658df8.dir
+  size: 81859869
+  nfiles: 9002
+  hash: md5
+  path: vienna

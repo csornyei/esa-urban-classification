@@ -1,0 +1,6 @@
+outs:
+- md5: f969423419120dff04f26d8d82212fff.dir
+  size: 91802502
+  nfiles: 10002
+  hash: md5
+  path: berlin

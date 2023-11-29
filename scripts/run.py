@@ -3,8 +3,8 @@ import shutil
 from pathlib import Path
 from typing import List
 
-from tqdm import tqdm
 import geopandas as gpd
+from tqdm import tqdm
 
 from etl.extract import (
     create_config,
@@ -12,9 +12,10 @@ from etl.extract import (
     get_bbox_size,
     request_true_color_image,
 )
+from etl.load import load
 from etl.transform import split_image_to_squares
-from utils.secrets import create_client, read_secret
 from utils.env import VAULT_ADDR, VAULT_TOKEN
+from utils.secrets import create_client, read_secret
 
 
 def run(city_names: List[str]):
@@ -66,6 +67,7 @@ def run(city_names: List[str]):
                 splits_folder,
                 square_size=25,
             )
+    load()
 
 
 if __name__ == "__main__":

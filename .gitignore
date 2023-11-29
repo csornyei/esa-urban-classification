@@ -129,7 +129,6 @@ cython_debug/
 
 footprints/*
 !footprints/*.geojson
-data/*
 !data/.gitkeep
 .env
 **.zip
